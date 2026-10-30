@@ -81,12 +81,39 @@ export function createApp(options = {}) {
 
   // Security: CORS hardening
   const allowedOrigins = env.corsOrigin
-    ? env.corsOrigin.split(",").map((s) => s.trim())
-    : ["http://localhost:5173", "http://127.0.0.1:5173"];
+    ? env.corsOrigin.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
   app.use(
     cors({
-      origin: allowedOrigins,
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.length > 0) {
+          if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+            return callback(null, true);
+          }
+        }
+
+        if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+          return callback(null, true);
+        }
+
+        try {
+          const parsed = new URL(origin);
+          if (parsed.hostname.endsWith(".onrender.com")) {
+            return callback(null, true);
+          }
+        } catch {
+          // Ignore URL parsing errors for non-standard origin headers
+        }
+
+        if (allowedOrigins.length > 0) {
+          return callback(new Error(`Origin ${origin} not allowed by CORS`));
+        }
+
+        return callback(null, true);
+      },
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
@@ -96,19 +123,18 @@ export function createApp(options = {}) {
 
   // Security: Anti brute-force rate limiting for auth endpoints (15 req/min per client)
   const authLimiter = createRateLimiterMiddleware({ limit: 15, windowMs: 60_000 });
-  app.use("/api/auth/login", authLimiter);
-  app.use("/api/auth/register", authLimiter);
+  app.use(["/api/auth/login", "/auth/login"], authLimiter);
+  app.use(["/api/auth/register", "/auth/register"], authLimiter);
 
   // Rate limit protection for resource-intensive and LLM endpoints
   const rateLimiter = createRateLimiterMiddleware({ limit: env.rateLimitPerMinute });
-  app.use("/api/events", rateLimiter);
-  app.use("/api/chat", rateLimiter);
+  app.use(["/api/events", "/events"], rateLimiter);
+  app.use(["/api/chat", "/chat"], rateLimiter);
 
-
-  // API Routes
-  app.use("/api/auth", authRoutes);
-  app.use("/api/events", eventRoutes);
-  app.use("/api/chat", chatRoutes);
+  // API Routes (supports both /api/* and /* for client resilience)
+  app.use(["/api/auth", "/auth"], authRoutes);
+  app.use(["/api/events", "/events"], eventRoutes);
+  app.use(["/api/chat", "/chat"], chatRoutes);
 
   // Root endpoint
   app.get("/", (req, res) => {

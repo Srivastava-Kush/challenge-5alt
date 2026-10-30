@@ -55,6 +55,28 @@ describe("Express MERN Application API", () => {
     });
   });
 
+  describe("CORS Configuration", () => {
+    test("allows requests and preflight from onrender.com subdomains", async () => {
+      const res = await fetch(`${app.base}/api/auth/register`, {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://challenge-5alt.onrender.com",
+          "Access-Control-Request-Method": "POST",
+          "Access-Control-Request-Headers": "Content-Type",
+        },
+      });
+      assert.equal(res.headers.get("access-control-allow-origin"), "https://challenge-5alt.onrender.com");
+      assert.equal(res.headers.get("access-control-allow-credentials"), "true");
+    });
+
+    test("routes /auth and /api/auth interchangeably", async () => {
+      const resNoApi = await fetch(`${app.base}/auth/me`);
+      assert.equal(resNoApi.status, HTTP_STATUS.UNAUTHORIZED);
+      const resWithApi = await fetch(`${app.base}/api/auth/me`);
+      assert.equal(resWithApi.status, HTTP_STATUS.UNAUTHORIZED);
+    });
+  });
+
   describe("Compression Middleware", () => {
     test("supports gzip compression when requested", async () => {
       const res = await fetch(`${app.base}/api/health`, {
