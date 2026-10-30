@@ -53,6 +53,12 @@ describe("loadEnv configuration", () => {
     assert.equal(config.hasCredentials, false);
   });
 
+  test("forces 0.0.0.0 on Render or production even if HOST is 127.0.0.1", () => {
+    assert.equal(loadEnv({ RENDER: "true", HOST: "127.0.0.1" }).host, "0.0.0.0");
+    assert.equal(loadEnv({ NODE_ENV: "production", JWT_SECRET: "secure-secret-key-12345", HOST: "127.0.0.1" }).host, "0.0.0.0");
+    assert.equal(loadEnv({ NODE_ENV: "production", JWT_SECRET: "secure-secret-key-12345" }).host, "0.0.0.0");
+  });
+
   test("detects an auth token as credentials", () => {
     assert.equal(loadEnv({ ANTHROPIC_AUTH_TOKEN: "token" }).hasCredentials, true);
   });

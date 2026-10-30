@@ -11,6 +11,8 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: HOST
+        value: 0.0.0.0
       - key: GEMINI_MODEL
         value: gemini-3-flash-preview
       - key: CORS_ORIGIN
